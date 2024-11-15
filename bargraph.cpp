@@ -237,7 +237,7 @@ private:
 		
 		fprintf(stdout, "Output su seriale: %s\n", data.c_str());
         serialPort.Write(data.c_str(), data.length());
-		snooze(100000);
+		//snooze(100000);
 		//readSerialData();
     }
 
