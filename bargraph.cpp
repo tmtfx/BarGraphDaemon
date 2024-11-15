@@ -7,8 +7,8 @@
 #include <string>
 #include <stdio.h>
 #include <ctype.h>
-//TODO Fix default sends only 3 bars @.@
-//FIX not reading config file
+#include <iostream>
+//FIX impostare luminosità predefinita
 class BarGraphDaemon : public BApplication {
 public:
     BarGraphDaemon()
@@ -16,7 +16,8 @@ public:
 			SetPulseRate(150000);
 		}
 		
-
+	
+	bool initialized=false;
     virtual void ReadyToRun() override {
         // Carica la configurazione
         config = loadConfig();
@@ -43,18 +44,12 @@ public:
 	
 	virtual void Pulse() override {
 		std::vector<int> values = getSystemData();
-		sendData(values);
+		if (initialized){
+			sendData(values);
+		}
+		initialized=true;
 	}
-	
-    /*void RunDaemonLoop() {
-        while (!QuitRequested()) {
-            // Recupera i dati di sistema in base alla configurazione
-            std::vector<int> values = getSystemData();
-            // Invia i dati via seriale
-            sendData(values);
-            snooze(250000);  // Pausa di 250 ms
-        }
-    }*/
+
 
 private:
     struct Config {
@@ -66,10 +61,10 @@ private:
 
     Config config;
     BSerialPort serialPort;
-
+	
     Config loadConfig() {
         Config config;
-        std::ifstream configFile("/boot/home/config/settings/tuo_addon.conf");
+        std::ifstream configFile("/boot/system/settings/bargraph.conf");
 
         if (configFile.is_open()) {
             std::getline(configFile, config.serialPort);
@@ -82,8 +77,8 @@ private:
             // Configurazione di default
             config.serialPort = "/dev/ports/usb0"; //TODO FixMe
             config.showLabels = true;
-            config.numBars = 4;
-            config.labels = {"1:", "2:", "3:", "4:"}; //implementata M: e F1,F2,Fx
+            config.numBars = 8;
+            config.labels = {"1:", "2:", "3:", "4:","F1", "F2", "F3", "F4"}; //implementata M: e F1,F2,Fx
             saveConfig(config);  // Salva la configurazione di default
         }
 
@@ -118,12 +113,12 @@ private:
         serialPort.SetDataBits(B_DATA_BITS_8);
         serialPort.SetStopBits(B_STOP_BITS_1);
         serialPort.SetParityMode(B_NO_PARITY);
-        serialPort.SetFlowControl(B_HARDWARE_CONTROL);//B_NOFLOW_CONTROL);
-
+        serialPort.SetFlowControl(B_NOFLOW_CONTROL);//B_HARDWARE_CONTROL);//
+		serialPort.SetTimeout(100000);
         return B_OK;
     }
-
-    std::vector<int> getSystemData() {
+	
+	std::vector<int> getSystemData() {
 		system_info sysInfo;
 		get_system_info(&sysInfo);
 
@@ -134,29 +129,32 @@ private:
 		// Ottiene i dati della CPU
 		get_cpu_info(0, sysInfo.cpu_count, cpuInfos.data());
 		uint64 defaultFrequency = get_default_cpu_freq();
+		
+		std::vector<bigtime_t> currentActiveTimes(sysInfo.cpu_count);
+
+		// Passaggio 1: Recupera i tempi attivi senza aggiornare previousActiveTimes
+		for (int i = 0; i < sysInfo.cpu_count; ++i) {
+			currentActiveTimes[i] = cpuInfos[i].active_time;
+		}
+
+		// Passaggio 2: Calcola il carico, memorizza i valori e prepara per aggiornare previousActiveTimes
 		for (const auto& label : config.labels) {
 			if (isdigit(label[0])) {
-				// Se il primo carattere della label è un numero, è il carico di una CPU specifica
-				int cpuIndex = label[0] - '0';  // Converte il carattere in numero
+				int cpuIndex = label[0] - '1';  // Converte il carattere in numero
 				if (cpuIndex < sysInfo.cpu_count) {
-					
-					// Calcola il carico della CPU come differenza dei tempi attivi da PicoLCD
-					int load = (cpuInfos[cpuIndex].active_time - previousActiveTimes[cpuIndex]) / 2000;
+					// Calcola il carico come differenza dei tempi attivi
+					int load = (currentActiveTimes[cpuIndex] - previousActiveTimes[cpuIndex]) / 1000;
 					values.push_back(load);
-					previousActiveTimes[cpuIndex] = cpuInfos[cpuIndex].active_time;  // Aggiorna il tempo attivo
 				} else {
 					values.push_back(0);  // Inserisce 0 se la CPU non esiste
 				}
 			} else if (label[0] == 'M') {
 				// Percentuale di memoria utilizzata
-				//int memUsage = static_cast<int>(100 - (sysInfo.used_pages * 100 / sysInfo.max_pages));
-				//values.push_back(memUsage);
 				int memoryUsage = ((sysInfo.used_pages * 100) / sysInfo.max_pages);
 				values.push_back(memoryUsage);
 			} else if (label[0] == 'F') {
 				int cpuIndex = label[1] - '1';  // "F1" -> CPU 0, "F2" -> CPU 1, ecc.
 				if (cpuIndex < sysInfo.cpu_count) {
-					
 					uint64 currentFrequency = cpuInfos[cpuIndex].current_frequency;
 					int frequencyPercent;
 					if (currentFrequency <= defaultFrequency) {
@@ -166,68 +164,20 @@ private:
 					} else {
 						frequencyPercent = 100;  // Limita al 100% se oltre il doppio della frequenza predefinita
 					}
-					
 					values.push_back(frequencyPercent);
-					/*cpu_info cpuInfo;
-					get_cpu_info(cpuIndex, 1, &cpuInfo);
-
-					// Calcolo della frequenza come percentuale relativa alla frequenza predefinita
-					 cpuInfo.default_frequency;
-					uint64 currentFrequency = cpuInfo.current_frequency;
-
-					int frequencyPercent;
-					if (currentFrequency <= defaultFrequency) {
-						frequencyPercent = (currentFrequency * 50) / defaultFrequency;
-					} else if (currentFrequency <= 2 * defaultFrequency) {
-						frequencyPercent = 50 + ((currentFrequency - defaultFrequency) * 50) / defaultFrequency;
-					} else {
-						frequencyPercent = 100;  // Limita al 100% se oltre il doppio della frequenza predefinita
-					}
-					
-					values.push_back(frequencyPercent);*/
 				} else {
 					values.push_back(0); // CPU non disponibile
 				}
-				/*// Frequenza della CPU
-				int cpuIndex = label[1] - '0';  // Usa il secondo carattere per indicare la CPU specifica
-				if (cpuIndex < sysInfo.cpu_count) {
-					values.push_back(cpuInfos[cpuIndex].cpu_clock_speed / 1000000);  // Frequenza in MHz
-				} else {
-					values.push_back(0);  // Inserisce 0 se la CPU non esiste
-				}*/
-			} 
-			// Gestione di altre metriche può essere aggiunta qui, come la temperatura.
+			}
 		}
+
+		// Passaggio 3: Aggiorna previousActiveTimes alla fine
+		for (int i = 0; i < sysInfo.cpu_count; ++i) {
+			previousActiveTimes[i] = currentActiveTimes[i];
+		}
+
 		return values;
-/*        std::vector<int> values;
-        system_info sysInfo;
-        get_system_info(&sysInfo);
-
-
-        int maxMemory = sysInfo.max_pages * B_PAGE_SIZE / (1024 * 1024);  // Memoria totale in MB
-        for (const auto& label : config.labels) {
-            if (isdigit(label[0])) {
-                int cpuIndex = label[0] - '1';  // Indice CPU
-                if (cpuIndex >= 0 && cpuIndex < sysInfo.cpu_count) {
-                    // Simula recupero carico CPU (qui usiamo un valore fittizio)
-                    values.push_back(sysInfo.cpu_infos[cpuIndex].active_time);
-                }
-            } else if (label == "M:") {
-                // Percentuale di memoria usata
-                int usedMemory = maxMemory - sysInfo.free_memory / (1024 * 1024);
-                int memUsage = static_cast<int>((usedMemory * 100) / maxMemory);
-                values.push_back(memUsage);
-            } else if (label[0] == 'F') {
-                // Simula la frequenza CPU in percentuale rispetto a maxFreq (sostituire con valore reale)
-                int maxFreq = 3000;  // Frequenza massima fittizia in MHz
-                int currentFreq = 2000;  // Frequenza corrente fittizia in MHz
-                int freqUsage = static_cast<int>((currentFreq * 100) / maxFreq);
-                values.push_back(freqUsage);
-            }
-        }
-
-        return values;*/
-    }
+	}
 	
 
     void sendData(const std::vector<int>& values) {
@@ -237,7 +187,10 @@ private:
             data += " " + std::to_string(values[i]);
         }
         data += "\n";
+		
+		fprintf(stdout, "Output su seriale: %s\n", data.c_str());
         serialPort.Write(data.c_str(), data.length());
+		//clearSerialBuffer(serialPort);
     }
 
     void configureLabels() {
@@ -246,9 +199,34 @@ private:
             labelConfig += " " + config.labels[i];
         }
         labelConfig += "\n";
+		fprintf(stdout, "Configurazione su seriale: %s\n", labelConfig.c_str());
         serialPort.Write(labelConfig.c_str(), labelConfig.length());
+		//clearSerialBuffer(serialPort);
+		snooze(150000);
     }
 	
+	void clearSerialBuffer(BSerialPort& serialPort) {
+		char buffer[128];
+		while (true) {
+			ssize_t bytesAvailable = serialPort.WaitForInput();
+			if (bytesAvailable <= 0) {
+				// Nessun dato disponibile o timeout raggiunto, esci dal loop
+				break;
+			}
+		}
+		 // Leggi i dati disponibili
+        ssize_t bytesRead = serialPort.Read(buffer, sizeof(buffer));
+        if (bytesRead > 0) {
+            // Stampa i dati letti per debug
+            std::cout.write(buffer, bytesRead);
+        }
+		/*
+		while (serialPort.Read(buffer, sizeof(buffer))>0) {
+			//std::cout << "Contenuto del buffer: " << buffer << std::endl;
+			fprintf(stdout, "contenuto del buffer: %s\n", buffer);
+		}
+		*/
+	}
 	uint64 get_default_cpu_freq(void) {
 	  uint32 topologyNodeCount = 0;
 	  cpu_topology_node_info* topology = NULL;
@@ -287,7 +265,7 @@ private:
 
 int main() {
     BarGraphDaemon app;
-    app.ReadyToRun();  // Inizializza il demone
+    //app.ReadyToRun();  // Inizializza il demone
     app.Run();  // Esegue il loop del demone
     return 0;
 }
