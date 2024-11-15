@@ -28,11 +28,13 @@ public:
             PostMessage(B_QUIT_REQUESTED);  // Termina il demone in caso di errore
             return;
         }
-		configureLabels(); //invia sempre la configurazione delle labels
-        // Invia configurazione delle etichette ad Arduino se necessario
 		if (!config.showLabels) {
 			serialPort.Write("2\n", 2);  // Invia "2" per disattivare le etichette
+			fprintf(stdout, "Etichette disattivate!\n");
 		}
+		configureLabels(); //invia sempre la configurazione delle labels
+        // Invia configurazione delle etichette ad Arduino se necessario
+		//readSerialData();
     }
 
     virtual bool QuitRequested() override {
@@ -41,12 +43,19 @@ public:
         serialPort.Close();
         return true;
     }
-	
+	int tmp = 1;
 	virtual void Pulse() override {
 		std::vector<int> values = getSystemData();
 		if (initialized){
+			if (!config.showLabels && tmp > 0) {
+				serialPort.Write("2\n", 2);
+				tmp--;
+			}
+			configureLabels();
 			sendData(values);
+			//readSerialData();
 		}
+		
 		initialized=true;
 	}
 
@@ -68,11 +77,19 @@ private:
 
         if (configFile.is_open()) {
             std::getline(configFile, config.serialPort);
+			//fprintf(stdout, "serial port: %s\n", config.serialPort.c_str());
             configFile >> config.showLabels >> config.numBars;
             std::string label;
             while (configFile >> label) {
                 config.labels.push_back(label);
             }
+			/*
+			fprintf(stdout, "Labels: ");
+			for (const auto& label : config.labels) {
+				fprintf(stdout, "%s ", label.c_str());
+			}
+			fprintf(stdout, "\n");
+			*/
         } else {
             // Configurazione di default
             config.serialPort = "/dev/ports/usb0"; //TODO FixMe
@@ -170,7 +187,6 @@ private:
 				}
 			}
 		}
-
 		// Passaggio 3: Aggiorna previousActiveTimes alla fine
 		for (int i = 0; i < sysInfo.cpu_count; ++i) {
 			previousActiveTimes[i] = currentActiveTimes[i];
@@ -179,18 +195,50 @@ private:
 		return values;
 	}
 	
+	std::string serialBuffer;
+	void readSerialData() {
+		char buffer[256];  // Buffer per i dati in arrivo
+		ssize_t bytesRead = serialPort.Read(buffer, sizeof(buffer) - 1);
+
+		if (bytesRead > 0) {
+			buffer[bytesRead] = '\0';  // Aggiungi terminatore di stringa
+			serialBuffer += buffer;
+			size_t pos;
+			while ((pos = serialBuffer.find('\n')) != std::string::npos) {
+				std::string message = serialBuffer.substr(0, pos);
+				serialBuffer.erase(0,pos+1);
+				fprintf(stdout, "Messaggio completo: %s\n", message.c_str());
+				if (message == "REBOOT") {
+					fprintf(stdout, "Arduino ha segnalato un reboot.\n");
+				}
+			}
+			/*
+			std::string data(buffer);
+
+			// Analizza o stampa i dati ricevuti
+			fprintf(stdout, "Ricevuto dalla seriale: %s\n", data.c_str());
+
+			// Puoi gestire risposte specifiche qui, ad esempio:
+			if (data == "REBOOT\n") {
+				fprintf(stdout, "Arduino ha segnalato un reboot.\n");
+				// Esegui eventuali azioni necessarie
+			}*/
+		} else if (bytesRead < 0) {
+			fprintf(stderr, "Errore nella lettura dalla seriale.\n");
+		}
+	}
 
     void sendData(const std::vector<int>& values) {
         std::string data = "0";
         for (size_t i = 0; i < values.size(); i++) {
-            //if (config.showLabels) data += config.labels[i] + " ";
             data += " " + std::to_string(values[i]);
         }
         data += "\n";
 		
 		fprintf(stdout, "Output su seriale: %s\n", data.c_str());
         serialPort.Write(data.c_str(), data.length());
-		//clearSerialBuffer(serialPort);
+		snooze(100000);
+		//readSerialData();
     }
 
     void configureLabels() {
@@ -199,34 +247,12 @@ private:
             labelConfig += " " + config.labels[i];
         }
         labelConfig += "\n";
-		fprintf(stdout, "Configurazione su seriale: %s\n", labelConfig.c_str());
+		//fprintf(stdout, "Configurazione su seriale: %s\n", labelConfig.c_str());
         serialPort.Write(labelConfig.c_str(), labelConfig.length());
-		//clearSerialBuffer(serialPort);
+		//readSerialData();
 		snooze(150000);
     }
-	
-	void clearSerialBuffer(BSerialPort& serialPort) {
-		char buffer[128];
-		while (true) {
-			ssize_t bytesAvailable = serialPort.WaitForInput();
-			if (bytesAvailable <= 0) {
-				// Nessun dato disponibile o timeout raggiunto, esci dal loop
-				break;
-			}
-		}
-		 // Leggi i dati disponibili
-        ssize_t bytesRead = serialPort.Read(buffer, sizeof(buffer));
-        if (bytesRead > 0) {
-            // Stampa i dati letti per debug
-            std::cout.write(buffer, bytesRead);
-        }
-		/*
-		while (serialPort.Read(buffer, sizeof(buffer))>0) {
-			//std::cout << "Contenuto del buffer: " << buffer << std::endl;
-			fprintf(stdout, "contenuto del buffer: %s\n", buffer);
-		}
-		*/
-	}
+
 	uint64 get_default_cpu_freq(void) {
 	  uint32 topologyNodeCount = 0;
 	  cpu_topology_node_info* topology = NULL;
@@ -247,7 +273,6 @@ private:
 	  int target, frac, delta;
 	  int freqs[] = { 100, 50, 25, 75, 33, 67, 20, 40, 60, 80, 10, 30, 70, 90 };
 	  uint x;
-
 	  target = cpuFrequency / 1000000;
 	  frac = target % 100;
 	  delta = -frac;
@@ -265,7 +290,6 @@ private:
 
 int main() {
     BarGraphDaemon app;
-    //app.ReadyToRun();  // Inizializza il demone
     app.Run();  // Esegue il loop del demone
     return 0;
 }
