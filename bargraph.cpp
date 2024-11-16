@@ -1,4 +1,9 @@
 /*
+ * Copyright 2024, Fabio Tomat <f.t.public@gmail.com>
+ * All rights reserved. Distributed under the terms of the MIT license.
+*/
+ 
+/*
 MIT License
 
 Copyright (c) 2024 Fabio Tomat (TmTFx)
@@ -33,15 +38,28 @@ SOFTWARE.
 #include <ctype.h>
 #include <iostream>
 //FIX impostare luminosità predefinita
+const uint32 SHOW_LABELS = 'SLAB';
+const uint32 REMOTE_QUIT_REQUEST = '_RQR';
+const uint32 SET_BRIGHTNESS = 'SETB';
+const uint32 SET_CONFIG = 'SCFG';
+
 class BarGraphDaemon : public BApplication {
 public:
+	bool initialized = false;
+	int tmp = 1;
+	bool switch_labels = false;
+	bool change_brightness = false;
+	int8 brightness;
+	std::string configuration;
+	std::string quit_msg = "3";
+
     BarGraphDaemon()
         : BApplication("application/x-vnd.BarGraphDaemon") {
 			SetPulseRate(150000);
 		}
 		
 	
-	bool initialized=false;
+	
     virtual void ReadyToRun() override {
         // Carica la configurazione
         config = loadConfig();
@@ -57,7 +75,6 @@ public:
 			fprintf(stdout, "Etichette disattivate!\n");
 		}
 		configureLabels(); //invia sempre la configurazione delle labels
-        // Invia configurazione delle etichette ad Arduino se necessario
 		//readSerialData();
     }
 
@@ -69,13 +86,18 @@ public:
         serialPort.Close();
         return true;
     }
-	int tmp = 1;
+	
 	virtual void Pulse() override {
 		std::vector<int> values = getSystemData();
 		if (initialized){
 			if (!config.showLabels && tmp > 0) {
 				serialPort.Write("2\n", 2);
 				tmp--;
+			}
+			if (switch_labels) {
+				serialPort.Write("2\n",2);
+				config.showLabels = !config.showLabels;
+				switch_labels = false;
 			}
 			configureLabels();
 			sendData(values);
@@ -85,7 +107,23 @@ public:
 		//PostMessage(pass);
 		initialized=true;
 	}
-
+	
+	virtual void MessageReceived(BMessage* message) override {
+        // Gestione dei messaggi ricevuti
+        switch (message->what) {
+            case SHOW_LABELS:
+                switch_labels = true;
+                break;
+            case SET_BRIGHTNESS:
+				brightness = message->FindInt8("bright");
+                change_brightness = true;
+                break;
+            default:
+                // Passa il messaggio alla classe base per gestione predefinita
+                BApplication::MessageReceived(message);
+                break;
+        }
+    }
 
 private:
     struct Config {
@@ -261,6 +299,10 @@ private:
         for (size_t i = 0; i < values.size(); i++) {
             data += " " + std::to_string(values[i]);
         }
+		if (change_brightness){
+			data += " " + std::to_string(brightness);
+			change_brightness = false;
+		}
         data += "\n";
 		
 		fprintf(stdout, "Output su seriale: %s\n", data.c_str());
