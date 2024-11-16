@@ -39,6 +39,8 @@ public:
 
     virtual bool QuitRequested() override {
         // Azioni di chiusura prima dello spegnimento
+		serialPort.Write("3 Addio e grazie per il pesce\n", 30);
+		snooze(500000);
         printf("Demone in chiusura...\n");
         serialPort.Close();
         return true;
@@ -90,6 +92,7 @@ private:
 			}
 			fprintf(stdout, "\n");
 			*/
+			
         } else {
             // Configurazione di default
             config.serialPort = "/dev/ports/usb0"; //TODO FixMe
