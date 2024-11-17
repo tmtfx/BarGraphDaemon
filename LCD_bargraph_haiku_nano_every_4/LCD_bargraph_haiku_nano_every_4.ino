@@ -68,6 +68,17 @@ byte StartBarChar[8] = {
   0b11111   // Riga 8
 };
 
+byte EmptyBarChar[8] = {
+  0b00000,  // Riga 1
+  0b00000,  // Riga 2
+  0b00000,  // Riga 3
+  0b00000,  // Riga 4
+  0b00000,  // Riga 5
+  0b00000,  // Riga 6
+  0b00000,  // Riga 7
+  0b00000   // Riga 8
+};
+
 String labels[8] = {"1:", "2:", "3:", "4:", "5:", "6:", "7:", "8:"};  // Etichette predefinite
 int numBars = 4;  // Numero iniziale di barre, configurabile
 bool showLabels = true;  // Variabile per decidere se visualizzare le etichette
@@ -79,6 +90,7 @@ void setup() {
   lcd.createChar(1, InnerBarChar);
   lcd.createChar(2, StartBarChar);
   lcd.createChar(3, EndBarChar);
+  lcd.createChar(4, EmptyBarChar);
   Serial.begin(115200);
   //Serial.println("Inizio setup");
   analogWrite(backlightPin, 128);  // Imposta retroilluminazione a metà potenza inizialmente
@@ -226,7 +238,7 @@ void configureLabels(String configString) {
 }
 
 void displayData(String dataString) {
-  lcd.clear();
+  //lcd.clear();
   int values[8];
   int valueCount = 0;
   int start = 0;
@@ -325,6 +337,8 @@ void displayData(String dataString) {
         barLength = map(constrainedValue, 0, 100, 0, 20);
       }
       for (int j = 0; j < barLength; j++) lcd.write(byte(255));
+      int maxBarLength = showLabels ? 18 : 20;
+      for (int j = barLength; j < maxBarLength; j++) lcd.write(byte(4));
     }
   }
 }
