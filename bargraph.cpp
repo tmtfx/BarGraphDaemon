@@ -49,7 +49,7 @@ public:
 	int tmp = 1;
 	bool switch_labels = false;
 	bool change_brightness = false;
-	int8 brightness;
+	//int8 brightness;
 	std::string configuration;
 	std::string quit_msg = "3";
 
@@ -115,8 +115,9 @@ public:
                 switch_labels = true;
                 break;
             case SET_BRIGHTNESS:
-				brightness = message->FindInt8("bright");
+				config.brightness = message->FindInt8("bright");
                 change_brightness = true;
+				saveConfig(config);
                 break;
             default:
                 // Passa il messaggio alla classe base per gestione predefinita
@@ -130,6 +131,7 @@ private:
         std::string serialPort;
         bool showLabels;
         int numBars;
+		int8 brightness;
         std::vector<std::string> labels;
     };
 
@@ -143,24 +145,17 @@ private:
         if (configFile.is_open()) {
             std::getline(configFile, config.serialPort);
 			//fprintf(stdout, "serial port: %s\n", config.serialPort.c_str());
-            configFile >> config.showLabels >> config.numBars;
+            configFile >> config.showLabels >> config.numBars >> config.brightness;
             std::string label;
             while (configFile >> label) {
                 config.labels.push_back(label);
-            }
-			/*
-			fprintf(stdout, "Labels: ");
-			for (const auto& label : config.labels) {
-				fprintf(stdout, "%s ", label.c_str());
-			}
-			fprintf(stdout, "\n");
-			*/
-			
+            }			
         } else {
             // Configurazione di default
-            config.serialPort = "/dev/ports/usb0"; //TODO FixMe
+            config.serialPort = "/dev/ports/usb0";
             config.showLabels = true;
             config.numBars = 8;
+			config.brightness = 80;
             config.labels = {"1:", "2:", "3:", "4:","F1", "F2", "F3", "F4"}; //implementata M: e F1,F2,Fx
             saveConfig(config);  // Salva la configurazione di default
         }
@@ -172,7 +167,7 @@ private:
         std::ofstream configFile("/boot/system/settings/bargraph.conf");
         if (configFile.is_open()) {
             configFile << config.serialPort << "\n";
-            configFile << config.showLabels << " " << config.numBars << "\n";
+            configFile << config.showLabels << " " << config.numBars << " " << config.brightness << "\n";
             for (const auto& label : config.labels) {
                 configFile << label << " ";
             }
@@ -300,7 +295,7 @@ private:
             data += " " + std::to_string(values[i]);
         }
 		if (change_brightness){
-			data += " " + std::to_string(brightness);
+			data += " " + std::to_string(config.brightness);
 			change_brightness = false;
 		}
         data += "\n";
