@@ -130,13 +130,14 @@ public:
 				{
 				std::string command = "3";
 				const char* foundString = nullptr;
-				status_t status = message->FindString("name", &foundString);
+				status_t status = message->FindString("text", &foundString);
 
 				if (status == B_OK && foundString != nullptr) {
 					fGoodByeMsg = std::string(foundString);
 					command += " " + fGoodByeMsg;
 				}
 				command += "\n";
+				printf("%s", command.c_str());
 				serialPort.Write(command.c_str(), command.length());
 				PostMessage(B_QUIT_REQUESTED);
 				}
