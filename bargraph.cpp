@@ -55,7 +55,7 @@ public:
 
     BarGraphDaemon()
         : BApplication("application/x-vnd.BarGraphDaemon") {
-			SetPulseRate(150000);
+			SetPulseRate(200000);
 		}
 
     virtual void ReadyToRun() override {
@@ -78,7 +78,7 @@ public:
 
     virtual bool QuitRequested() override {
         // Azioni di chiusura prima dello spegnimento
-		serialPort.Write("3 Addio e grazie per il pesce\n", 30);
+		//serialPort.Write("3 Addio e grazie per il pesce\n", 30);
 		snooze(500000);
         printf("Demone in chiusura...\n");
         serialPort.Close();
@@ -126,6 +126,21 @@ public:
 					fprintf(stderr, "Impossibile trovare il valore 'bright' nel messaggio.\n");
 				}
 				break;
+			case REMOTE_QUIT_REQUEST:
+				{
+				std::string command = "3";
+				const char* foundString = nullptr;
+				status_t status = message->FindString("name", &foundString);
+
+				if (status == B_OK && foundString != nullptr) {
+					fGoodByeMsg = std::string(foundString);
+					command += " " + fGoodByeMsg;
+				}
+				command += "\n";
+				serialPort.Write(command.c_str(), command.length());
+				PostMessage(B_QUIT_REQUESTED);
+				}
+				break;
             default:
                 // Passa il messaggio alla classe base per gestione predefinita
                 BApplication::MessageReceived(message);
@@ -144,6 +159,7 @@ private:
 
     Config config;
     BSerialPort serialPort;
+	std::string fGoodByeMsg = "Shutting Down";
 	
     Config loadConfig() {
         Config config;
