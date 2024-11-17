@@ -57,9 +57,7 @@ public:
         : BApplication("application/x-vnd.BarGraphDaemon") {
 			SetPulseRate(150000);
 		}
-		
-	
-	
+
     virtual void ReadyToRun() override {
         // Carica la configurazione
         config = loadConfig();
@@ -115,10 +113,19 @@ public:
                 switch_labels = true;
                 break;
             case SET_BRIGHTNESS:
-				config.brightness = message->FindInt8("bright");
-                change_brightness = true;
-				saveConfig(config);
-                break;
+				int8_t brightValue;
+				if (message->FindInt8("bright", &brightValue) == B_OK) {
+					if (brightValue >= 0 && brightValue <= 100) {
+						config.brightness = brightValue;
+						change_brightness = true;
+						saveConfig(config);
+					} else {
+						fprintf(stderr, "Valore di brightness non valido: %d\n", brightValue);
+					}
+				} else {
+					fprintf(stderr, "Impossibile trovare il valore 'bright' nel messaggio.\n");
+				}
+				break;
             default:
                 // Passa il messaggio alla classe base per gestione predefinita
                 BApplication::MessageReceived(message);
@@ -131,7 +138,7 @@ private:
         std::string serialPort;
         bool showLabels;
         int numBars;
-		int8 brightness;
+		int brightness;
         std::vector<std::string> labels;
     };
 
