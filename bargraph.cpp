@@ -48,6 +48,7 @@ public:
 	bool initialized = false;
 	int tmp = 1;
 	bool switch_labels = false;
+	bool initial_backlight = true;
 	bool change_brightness = false;
 	//int8 brightness;
 	std::string configuration;
@@ -98,6 +99,10 @@ public:
 				switch_labels = false;
 			}
 			configureLabels();
+			if (initial_backlight){
+				set_initial_backlight();
+				initial_backlight=false;
+			}
 			sendData(values);
 			//readSerialData();
 		}
@@ -137,7 +142,7 @@ public:
 					command += " " + fGoodByeMsg;
 				}
 				command += "\n";
-				printf("%s", command.c_str());
+				//printf("%s", command.c_str());
 				serialPort.Write(command.c_str(), command.length());
 				PostMessage(B_QUIT_REQUESTED);
 				}
@@ -341,6 +346,18 @@ private:
 		//readSerialData();
 		snooze(150000);
     }
+	void set_initial_backlight(){
+		std::string labelConfig = "0";
+        for (int i = 0; i < config.numBars; i++) {
+            labelConfig += " 0";
+        }
+		labelConfig += " " + std::to_string(config.brightness);
+		labelConfig += "\n";
+		//fprintf(stdout, "Imposto luminosità: %s\n", labelConfig.c_str());
+        serialPort.Write(labelConfig.c_str(), labelConfig.length());
+		snooze(150000);
+	}
+	
 
 	uint64 get_default_cpu_freq(void) {
 	  uint32 topologyNodeCount = 0;
@@ -358,20 +375,6 @@ private:
 		}
 	  }
 	  free(topology);
-	/*
-	  int target, frac, delta;
-	  int freqs[] = { 100, 50, 25, 75, 33, 67, 20, 40, 60, 80, 10, 30, 70, 90 };
-	  uint x;
-	  target = cpuFrequency / 1000000;
-	  frac = target % 100;
-	  delta = -frac;
-
-	  for (x = 0; x < sizeof(freqs) / sizeof(freqs[0]); x++) {
-		int ndelta = freqs[x] - frac;
-		if (abs(ndelta) < abs(delta))
-		  delta = ndelta;
-	  }
-	  return target + delta;*/
 	  return cpuFrequency;
 	}
 
