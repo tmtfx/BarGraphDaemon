@@ -30,6 +30,8 @@ SOFTWARE.
 #include <Application.h>
 #include <Looper.h>
 #include <SerialPort.h>
+#include <String.h>
+#include <StringList.h>
 #include <OS.h>
 #include <fstream>
 #include <vector>
@@ -145,6 +147,36 @@ public:
 				//printf("%s", command.c_str());
 				serialPort.Write(command.c_str(), command.length());
 				PostMessage(B_QUIT_REQUESTED);
+				}
+				break;
+			case SET_CONFIG:
+				{
+					int8 numRecv;
+					if (message->FindInt8("numBars", &numRecv) ==B_OK) {
+						config.numBars= numRecv;
+						BStringList etichette(numRecv);
+						if (message->FindStrings("labels",&etichette) == B_OK){
+							config.labels.clear();
+							for (int i = 0; i < etichette.CountStrings(); i++) {
+								config.labels.push_back(etichette.StringAt(i).String());
+							}
+							saveConfig(config);
+						} else {
+							return;
+						}
+						BString configString = "1 ";
+						for (int i = 0; i < etichette.CountStrings(); i++) {
+							configString << etichette.StringAt(i);
+							if (i < etichette.CountStrings() -1) {
+								configString << " ";
+							}
+						}
+						serialPort.Write(configString.String(),configString.Length());
+						snooze(200000);
+						serialPort.Write("4\n",2);
+						serialPort.Write("4\n",2);
+						snooze(200000);
+					}
 				}
 				break;
             default:
