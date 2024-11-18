@@ -124,6 +124,8 @@ void loop() {
       // Spegni la retroilluminazione del display*/
       lcd.clear();
       analogWrite(backlightPin, 0);
+    } else if (commandType == 4) {
+      lcd.clear();
     }
   }
 }
@@ -328,17 +330,19 @@ void displayData(String dataString) {
         }
       }
     } else {
-      lcd.setCursor(0, i);
-      int constrainedValue = constrain(values[i], 0, 100);
-      if (showLabels) {
-        lcd.print(labels[i]);
-        barLength = map(constrainedValue, 0, 100, 0, 18);
-      } else {
-        barLength = map(constrainedValue, 0, 100, 0, 20);
+      if ( i < numBars ){
+        lcd.setCursor(0, i);
+        int constrainedValue = constrain(values[i], 0, 100);
+        if (showLabels) {
+          lcd.print(labels[i]);
+          barLength = map(constrainedValue, 0, 100, 0, 18);
+        } else {
+          barLength = map(constrainedValue, 0, 100, 0, 20);
+        }
+        for (int j = 0; j < barLength; j++) lcd.write(byte(255));
+        int maxBarLength = showLabels ? 18 : 20;
+        for (int j = barLength; j < maxBarLength; j++) lcd.write(byte(4));
       }
-      for (int j = 0; j < barLength; j++) lcd.write(byte(255));
-      int maxBarLength = showLabels ? 18 : 20;
-      for (int j = barLength; j < maxBarLength; j++) lcd.write(byte(4));
     }
   }
 }
