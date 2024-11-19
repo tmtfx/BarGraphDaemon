@@ -27,6 +27,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+// TODO write an echo to BarGraphPreflet throug MessageReceived
+
 #include <Application.h>
 #include <Looper.h>
 #include <SerialPort.h>
@@ -44,6 +46,7 @@ static const uint32 REMOTE_QUIT_REQUEST = '_RQR';
 static const uint32 SET_BRIGHTNESS = 'SETB';
 static const uint32 SET_CONFIG = 'SCFG';
 static const uint32 SERIAL_PATH = 'SPTH';
+static const uint32 DAEMON_PING = 'PING';
 
 class BarGraphDaemon : public BApplication {
 public:
@@ -113,8 +116,8 @@ public:
                 switch_labels = true;
                 break;
             case SET_BRIGHTNESS:
-				int8_t brightValue;
-				if (message->FindInt8("bright", &brightValue) == B_OK) {
+				int brightValue;
+				if (message->FindInt32("bright", &brightValue) == B_OK) {
 					if (brightValue >= 0 && brightValue <= 100) {
 						config.brightness = brightValue;
 						change_brightness = true;
@@ -143,8 +146,8 @@ public:
 				break;
 			case SET_CONFIG:
 				{
-					int8 numRecv;
-					if (message->FindInt8("numBars", &numRecv) ==B_OK) {
+					int numRecv;
+					if (message->FindInt32("numBars", &numRecv) ==B_OK) {
 						config.numBars= numRecv;
 						BStringList etichette(numRecv);
 						if (message->FindStrings("labels",&etichette) == B_OK){
@@ -179,6 +182,12 @@ public:
 						config.serialPort = std::string(foundString);
 						saveConfig(config);
 					}
+				}
+				break;
+			case DAEMON_PING:
+				{
+					BMessenger messenger("application/x-vnd.BarGraph-Preflet");
+					messenger.SendMessage(message);
 				}
 				break;
             default:
