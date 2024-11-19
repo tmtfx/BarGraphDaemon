@@ -51,7 +51,7 @@ static const uint32 DAEMON_PING = 'PING';
 class BarGraphDaemon : public BApplication {
 public:
 	bool initialized = false;
-	int tmp = 1;
+	bool tmp = true;
 	bool switch_labels = false;
 	bool initial_backlight = true;
 	bool change_brightness = false;
@@ -74,7 +74,7 @@ public:
         }
 		if (!config.showLabels) {
 			serialPort.Write("2\n", 2);  // Invia "2" per disattivare le etichette
-			fprintf(stdout, "Etichette disattivate!\n");
+			//fprintf(stdout, "Etichette disattivate!\n");
 		}
 		configureLabels(); //invia sempre la configurazione delle labels
 		//readSerialData();
@@ -90,13 +90,15 @@ public:
 	virtual void Pulse() override {
 		std::vector<int> values = getSystemData();
 		if (initialized){
-			if (!config.showLabels && tmp > 0) {
+			if (!config.showLabels && tmp ) {
 				serialPort.Write("2\n", 2);
-				tmp--;
+				tmp=false;
 			}
+			tmp=false;
 			if (switch_labels) {
 				serialPort.Write("2\n",2);
 				config.showLabels = !config.showLabels;
+				saveConfig(config);
 				switch_labels = false;
 			}
 			configureLabels();
