@@ -27,8 +27,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// TODO write an echo to BarGraphPreflet throug MessageReceived
-
 #include <Application.h>
 #include <Looper.h>
 #include <SerialPort.h>
@@ -47,6 +45,7 @@ static const uint32 SET_BRIGHTNESS = 'SETB';
 static const uint32 SET_CONFIG = 'SCFG';
 static const uint32 SERIAL_PATH = 'SPTH';
 static const uint32 DAEMON_PING = 'PING';
+static const uint32 SPECIAL_GRAPH = 'GRPH';
 
 class BarGraphDaemon : public BApplication {
 public:
@@ -69,11 +68,11 @@ public:
 
         if (setupSerialPort() != B_OK) {
             fprintf(stderr, "Errore nell'inizializzazione della porta seriale.\n");
-            PostMessage(B_QUIT_REQUESTED);  // Termina il demone in caso di errore
+            PostMessage(B_QUIT_REQUESTED);
             return;
         }
 		if (!config.showLabels) {
-			serialPort.Write("2\n", 2);  // Invia "2" per disattivare le etichette
+			serialPort.Write("2\n", 2);
 			//fprintf(stdout, "Etichette disattivate!\n");
 		}
 		configureLabels(); //invia sempre la configurazione delle labels
@@ -106,8 +105,12 @@ public:
 				set_initial_backlight();
 				initial_backlight=false;
 			}
-			sendData(values);
-			//readSerialData();
+			if (specialgraph && config.numBars == 1){
+				sendGraph(values[0]);
+			} else {
+				sendData(values);
+				//readSerialData();
+			}
 		}
 		initialized=true;
 	}
@@ -192,6 +195,16 @@ public:
 					messenger.SendMessage(message);
 				}
 				break;
+			case SPECIAL_GRAPH:
+				{
+					bool act_state;
+					status_t status = message->FindBool("graphicMode", &act_state);
+					if (status == B_OK) specialgraph = act_state;
+					/*int index;
+					status = message->FindInt32("index", &index);
+					if (status == B_OK) specialgraph.index = index;*/
+				}
+				break;
             default:
                 BApplication::MessageReceived(message);
                 break;
@@ -207,6 +220,7 @@ private:
         std::vector<std::string> labels;
     };
 
+	bool specialgraph;
     Config config;
     BSerialPort serialPort;
 	std::string fGoodByeMsg = "Shutting Down";
@@ -228,7 +242,7 @@ private:
             config.showLabels = true;
             config.numBars = 8;
 			config.brightness = 80;
-            config.labels = {"1:", "2:", "3:", "4:","F1", "F2", "F3", "F4"}; //implementata M: e F1,F2,Fx
+            config.labels = {"1:", "2:", "3:", "4:","F1", "F2", "F3", "F4"};
             saveConfig(config);
         }
 
@@ -284,7 +298,7 @@ private:
 			if (isdigit(label[0])) {
 				int cpuIndex = label[0] - '1';
 				if (cpuIndex < sysInfo.cpu_count) {
-					int load = (currentActiveTimes[cpuIndex] - previousActiveTimes[cpuIndex]) / 1000;
+					int load = (currentActiveTimes[cpuIndex] - previousActiveTimes[cpuIndex]) / 2000;
 					values.push_back(load);
 				} else {
 					values.push_back(0);
@@ -338,6 +352,16 @@ private:
 		} else if (bytesRead < 0) {
 			fprintf(stderr, "Errore nella lettura dalla seriale.\n");
 		}
+	}
+	void sendGraph(int& value) {
+		std::string data = "5 "+ std::to_string(value);
+		if (change_brightness){
+			data += " " + std::to_string(config.brightness);
+			change_brightness = false;
+		}
+        data += "\n";
+		serialPort.Write(data.c_str(), data.length());
+		fprintf(stdout,"testo inviato: %s",data.c_str());
 	}
 
     void sendData(const std::vector<int>& values) {
