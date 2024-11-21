@@ -79,95 +79,146 @@ byte EmptyBarChar[8] = {
   0b00000   // Riga 8
 };
 
+byte ZeroBarGraphChar[8] = {
+  0b00000,  // Riga 1
+  0b00000,  // Riga 2
+  0b00000,  // Riga 3
+  0b00000,  // Riga 4
+  0b00000,  // Riga 5
+  0b00000,  // Riga 6
+  0b00000,  // Riga 7
+  0b11111   // Riga 8
+};
+
+byte HalfBarGraphChar[8] = {
+  0b00000,  // Riga 1
+  0b00000,  // Riga 2
+  0b00000,  // Riga 3
+  0b00000,  // Riga 4
+  0b11111,  // Riga 5
+  0b11111,  // Riga 6
+  0b11111,  // Riga 7
+  0b11111   // Riga 8
+};
+/*
+byte HalfUBarGraphChar[8] = {
+  0b11111,  // Riga 1
+  0b11111,  // Riga 2
+  0b11111,  // Riga 3
+  0b11111,  // Riga 4
+  0b00000,  // Riga 5
+  0b00000,  // Riga 6
+  0b00000,  // Riga 7
+  0b00000   // Riga 8
+};*/
+
+class FIFO {
+private:
+    static const int size = 20;
+    int buffer[size] = {0};
+
+public:
+    FIFO() {
+        // Inizializza tutti gli elementi a 0 (opzionale già fatto sopra, per sicurezza ripeto)
+        for (int i = 0; i < size; i++) {
+            buffer[i] = 0;
+        }
+    }
+    void push(int value) {
+        if (value < 0 || value > 100) {
+            return;
+        }
+        for (int i = 0; i < size-1; i++) {
+          buffer[i]=buffer[i+1];
+        }
+        
+        buffer[size-1] = value;
+    }
+    void get(int output[size]) {
+        for (int i = 0; i < size; ++i) {
+            output[i] = buffer[i];
+        }
+    }
+};
+
 String labels[8] = {"1:", "2:", "3:", "4:", "5:", "6:", "7:", "8:"};  // Etichette predefinite
-int numBars = 4;  // Numero iniziale di barre, configurabile
-bool showLabels = true;  // Variabile per decidere se visualizzare le etichette
+int numBars = 4;
+bool showLabels = true;
+FIFO* fifo = new FIFO();
 
 void setup() {
   pinMode(backlightPin, OUTPUT);
-  lcd.begin(20, 4);bool showLabels = true;  // Variabile per decidere se visualizzare le etichette
+  lcd.begin(20, 4);
   lcd.createChar(0, semiTransparentChar);
   lcd.createChar(1, InnerBarChar);
   lcd.createChar(2, StartBarChar);
   lcd.createChar(3, EndBarChar);
   lcd.createChar(4, EmptyBarChar);
+  lcd.createChar(5,ZeroBarGraphChar);
+  lcd.createChar(6,HalfBarGraphChar);
   Serial.begin(115200);
-  //Serial.println("Inizio setup");
-  analogWrite(backlightPin, 128);  // Imposta retroilluminazione a metà potenza inizialmente
-  //Serial.println("Fine setup");
+  analogWrite(backlightPin, 128);
 }
 
 void loop() {
   if (Serial.available()) {
     String input = Serial.readStringUntil('\n');
-    //Serial.print("Received string: ");
-    //Serial.println(input);
     int commandType = input.substring(0, 1).toInt();
 
     if (commandType == 0) {
-      // Modalità di visualizzazione dei dati
       displayData(input.substring(2));
     } else if (commandType == 1) {
-      // Modalità di configurazione etichette
       configureLabels(input.substring(2));
     } else if (commandType == 2) {
-      // Comando per abilitare/disabilitare le etichette
       showLabels = !showLabels;
-      //Serial.print("Show labels: ");
-      //Serial.println(showLabels ? "Enabled" : "Disabled");
     } else if (commandType == 3) {
       String message = input.substring(2);
       if (message.length() > 0) {
         displayMessage(message);
         delay(3000);
       }
-      // Spegni la retroilluminazione del display*/
       lcd.clear();
       analogWrite(backlightPin, 0);
     } else if (commandType == 4) {
       lcd.clear();
+    } else if (commandType == 5) {
+      displayGraph(input.substring(2));
     }
   }
 }
 
 void displayMessage(String message) {
   lcd.clear();
-  // Se la stringa contiene un carattere di newline, la divido in due parti
   int newlinePos = message.indexOf('\n');
   
   if (newlinePos != -1) {
-    // Se c'è un '\n', divido la stringa in due parti
     String firstLine = message.substring(0, newlinePos);
-    String secondLine = message.substring(newlinePos + 1); // +1 per escludere il '\n'
-    
-    // Centratura per la prima riga
+    String secondLine = message.substring(newlinePos + 1);
+
     int len1 = firstLine.length();
-    int pos1 = (16 - len1) / 2;  // Calcola la posizione centrale della riga
+    int pos1 = (16 - len1) / 2;
     lcd.setCursor(pos1, 0);
     lcd.print(firstLine);
     
-    // Centratura per la seconda riga
     int len2 = secondLine.length();
-    int pos2 = (16 - len2) / 2;  // Calcola la posizione centrale della riga
+    int pos2 = (16 - len2) / 2;
     lcd.setCursor(pos2, 1);
     lcd.print(secondLine);
     
   } else if (message.length() <= 20) {
-    // Se la stringa è inferiore o uguale a 20 caratteri, centratela sulla seconda riga
     int len = message.length();
-    int pos = (16 - len) / 2;  // Calcola la posizione centrale della riga
+    int pos = (16 - len) / 2;
     lcd.setCursor(pos, 1);
     lcd.print(message);
 
   } else if (message.length() <= 40) {
     int len = message.length();
-    int minDist = 40;  // Inizializza con la lunghezza massima della stringa
-    int splitPos = -1;  // Posizione dove fare il "a capo"
+    int minDist = 40;
+    int splitPos = -1;
 
-    // Trova la posizione dello spazio più vicino al centro (massimo 20 caratteri per la prima riga)
     for (int i = 0; i < len && i < 20; i++) {
         if (message[i] == ' ') {
-            int dist = abs(i - 10);  // Distanza dal centro della riga (10 è il centro)
+            int dist = abs(i - 10);
             if (dist < minDist) {
                 minDist = dist;
                 splitPos = i;
@@ -175,48 +226,39 @@ void displayMessage(String message) {
         }
     }
 
-    // Se troviamo un buon punto di split, dividi la stringa
     if (splitPos != -1) {
         String firstLine = message.substring(0, splitPos);
-        String secondLine = message.substring(splitPos + 1);  // Dopo lo spazio
+        String secondLine = message.substring(splitPos + 1);
 
-        // Centra la prima riga sulla prima riga del display (massimo 20 caratteri)
         int pos1 = (16 - firstLine.length()) / 2;
         lcd.setCursor(pos1, 0);
         lcd.print(firstLine);
 
-        // Se la seconda riga è maggiore di 20 caratteri, dividila
         if (secondLine.length() > 20) {
-            String secondPart = secondLine.substring(0, 20);  // La prima parte della seconda riga
-            String thirdPart = secondLine.substring(20);  // La seconda parte, che va su una terza riga
+            String secondPart = secondLine.substring(0, 20);
+            String thirdPart = secondLine.substring(20);
 
-            // Centra la seconda riga
             int pos2 = (16 - secondPart.length()) / 2;
             lcd.setCursor(pos2, 1);
             lcd.print(secondPart);
 
-            // Centra la terza riga
             int pos3 = (16 - thirdPart.length()) / 2;
             lcd.setCursor(pos3, 2);
             lcd.print(thirdPart);
         } else {
-            // Centra la seconda riga sulla seconda riga del display
             int pos2 = (16 - secondLine.length()) / 2;
             lcd.setCursor(pos2, 1);
             lcd.print(secondLine);
         }
 
     } else {
-        // Se non ci sono spazi, fai un "a capo" fisso dopo 20 caratteri
         String firstLine = message.substring(0, 20);
         String secondLine = message.substring(20);
 
-        // Centra la prima riga
         int pos1 = (16 - firstLine.length()) / 2;
         lcd.setCursor(pos1, 0);
         lcd.print(firstLine);
 
-        // Centra la seconda riga
         int pos2 = (16 - secondLine.length()) / 2;
         lcd.setCursor(pos2, 1);
         lcd.print(secondLine);
@@ -228,7 +270,6 @@ void configureLabels(String configString) {
   int labelCount = 0;
   int start = 0;
 
-  // Estrai ogni etichetta e aggiornala nell'array labels
   while (labelCount < 8 && start < configString.length()) {
     int pos = configString.indexOf(' ', start);
     if (pos == -1) pos = configString.length();
@@ -236,7 +277,71 @@ void configureLabels(String configString) {
     start = pos + 1;
     labelCount++;
   }
-  numBars = labelCount;  // Numero di barre impostato da config
+  numBars = labelCount;
+}
+
+void displayGraph(String dataString) {
+  int value;
+  bool valueGot = false;
+  int start = 0;
+  
+  while (!valueGot && start < dataString.length()) {
+    int pos = dataString.indexOf(' ', start);
+    if (pos == -1) pos = dataString.length();
+    value = dataString.substring(start, pos).toInt();
+    start = pos + 1;
+    valueGot=true;
+  }
+
+  if (start < dataString.length()) {
+    int backlightLevel = dataString.substring(start).toInt();
+    backlightLevel = constrain(backlightLevel, 0, 100);
+    int pwmValue = map(backlightLevel, 0, 100, 0, 255);
+    analogWrite(backlightPin, pwmValue);
+  }
+
+  int constrValue = constrain(value, 0, 100);
+  
+  fifo->push(constrValue);
+  int data[20];
+  fifo->get(data);
+  for (int col = 0; col < 20; col++) {
+    int value = data[col];
+    int fullBlocks = value / 25; //25% = 1/4 siccome ci sono 4 quadrati pieni su ogni colonna
+    int remainder = value % 25;
+
+    for (int row = 3; row >= 0; row--) {
+        lcd.setCursor(col, row);
+
+        if (fullBlocks > 0) {
+            // Se ci sono righe completamente piene, usa il carattere pieno
+            lcd.write(byte(255));
+            fullBlocks--;
+        } else if (remainder > 0) {
+            // Se c'è un resto, scegli il carattere corretto
+            if (row == 3) { // Resto sulla quarta riga
+                if (remainder < 7) {
+                    lcd.write(byte(5)); // Mezzo quadratino vuoto
+                } else if (remainder < 13) {
+                    lcd.write(byte(6)); // Mezzo quadratino pieno
+                } else {
+                    lcd.write(byte(255)); // Quadratino pieno
+                }
+            } else {
+                if (remainder < 13) {
+                    lcd.write(byte(6)); // Mezzo quadratino pieno
+                } else {
+                    lcd.write(byte(255)); // Quadratino pieno
+                }
+                //lcd.write(4); // Spazio vuoto per righe superiori
+            }
+            remainder = 0; // Consuma il resto
+        } else {
+            // Righe vuote
+            lcd.write(4);
+        }
+    }
+  }
 }
 
 void displayData(String dataString) {
