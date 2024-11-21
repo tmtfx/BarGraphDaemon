@@ -127,7 +127,7 @@ public:
                 switch_labels = true;
                 break;
             case SET_BRIGHTNESS:
-				int brightValue;
+				int32 brightValue;
 				if (message->FindInt32("bright", &brightValue) == B_OK) {
 					if (brightValue >= 0 && brightValue <= 100) {
 						config.brightness = brightValue;
@@ -157,7 +157,7 @@ public:
 				break;
 			case SET_CONFIG:
 				{
-					int numRecv;
+					int32 numRecv;
 					if (message->FindInt32("numBars", &numRecv) ==B_OK) {
 						config.numBars= numRecv;
 						BStringList etichette(numRecv);
