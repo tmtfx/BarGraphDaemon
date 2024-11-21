@@ -56,6 +56,7 @@ public:
 	bool change_brightness = false;
 	std::string configuration;
 	std::string quit_msg = "3";
+	int counterSpecGraph = 2;
 
     BarGraphDaemon()
         : BApplication("application/x-vnd.BarGraphDaemon") {
@@ -106,7 +107,12 @@ public:
 				initial_backlight=false;
 			}
 			if (specialgraph && config.numBars == 1){
-				sendGraph(values[0]);
+				if (counterSpecGraph > 0) {
+					counterSpecGraph-=1;
+				} else {
+					sendGraph(values[0]);
+					counterSpecGraph=2;
+				}
 			} else {
 				sendData(values);
 				//readSerialData();
@@ -361,7 +367,6 @@ private:
 		}
         data += "\n";
 		serialPort.Write(data.c_str(), data.length());
-		fprintf(stdout,"testo inviato: %s",data.c_str());
 	}
 
     void sendData(const std::vector<int>& values) {
