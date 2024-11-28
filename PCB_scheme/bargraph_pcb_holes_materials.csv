@@ -1,0 +1,7 @@
+"Reference","Value","Datasheet","Footprint","Qty","DNP"
+"A1","Arduino_Nano_Every","https://content.arduino.cc/assets/NANOEveryV3.0_sch.pdf","Module:Arduino_Nano","1",""
+"J1","Conn_01x16_Socket","~","Connector_PinHeader_2.54mm:PinHeader_1x16_P2.54mm_Vertical","1",""
+"R1","2K","~","Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical","1",""
+"R2","6.75K","~","Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical","1",""
+"R3","330","~","Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical","1",""
+"R4","1K","~","Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical","1",""
